@@ -1,0 +1,61 @@
+
+name: Build SPFx and produce .sppkg
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set Node version (LTS compatible with SPFx 1.22)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'   # SPFx 1.22 supports Node 18
+
+      - name: Install Yeoman + SPFx generator
+        run: |
+          npm i -g yo @microsoft/generator-sharepoint gulp
+
+      - name: Scaffold SPFx project
+        run: |
+          mkdir -p spfx
+          cd spfx
+          yo @microsoft/sharepoint \
+            --skip-install \
+            --solution-name CurrentUserLinkSolution \
+            --framework react \
+            --component-type webpart \
+            --component-name CurrentUserLink \
+            --environment spo \
+            --is-domain-isolated false \
+            --plusbeta false << 'EOF'
+          EOF
+
+      - name: Install project dependencies
+        working-directory: spfx
+        run: npm install
+
+      - name: Overlay web part files from repo (your zip contents)
+        run: |
+          rsync -a --delete CurrentUserLink-SPFx-sample/src/webparts/currentUserLink/ spfx/src/webparts/currentUserLink/
+
+      - name: Build (Heft)
+        working-directory: spfx
+        run: npx heft build --production
+
+      - name: Package solution (.sppkg)
+        working-directory: spfx
+        run: gulp package-solution --ship
+
+      - name: Upload .sppkg artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sppkg
+          path: spfx/sharepoint/solution/*.sppkg
