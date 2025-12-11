@@ -1,0 +1,22 @@
+
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx/client-side-web-part-manifest.schema.json",
+  "id": "00000000-0000-0000-0000-000000000001",
+  "alias": "CurrentUserLinkWebPart",
+  "componentType": "WebPart",
+  "version": "1.0.0",
+  "manifestVersion": 2,
+  "requiresCustomScript": false,
+  "supportedHosts": ["SharePointWebPart", "SharePointFullPage"],
+  "preconfiguredEntries": [
+    {
+      "title": {"default": "Current User Link"},
+      "description": {"default": "Open your app with current user's name & email"},
+      "group": {"default": "Other"},
+      "properties": {
+        "baseUrl": "https://in4-aro-shs-app-prd-web-02.azurewebsites.net/Pages/default.aspx",
+        "showDetails": false
+      }
+    }
+  ]
+}
