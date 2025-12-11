@@ -1,0 +1,78 @@
+
+name: Build SPFx and produce .sppkg
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      # Reduce interactivity/telemetry so CI never hangs
+      CI: true
+      ADBLOCK: true
+      NO_UPDATE_NOTIFIER: true
+      YO_ALLOW_UNSUPPORTED: true
+      YO_CONFIG_HOME: ${{ github.workspace }}/.yo
+      # SPFx generator respects these to avoid prompts
+      YEOMAN_DO_NOT_TRACK: 1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set Node version (SPFx 1.22+ supports Node 18)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install Yeoman + SPFx generator + gulp
+        run: |
+          npm i -g yo @microsoft/generator-sharepoint@latest gulp
+
+      - name: Scaffold SPFx project (non-interactive)
+        run: |
+          mkdir -p spfx
+          cd spfx
+          # supply all answers so no prompt occurs
+          yo @microsoft/sharepoint \
+            --environment spo \
+            --framework react \
+            --component-type webpart \
+            --component-name CurrentUserLink \
+            --component-description "Dynamic link with current user" \
+            --solution-name "CurrentUserLinkSolution" \
+            --solution-description "SPFx sample that builds a same-tab link with current user name & email" \
+            --is-domain-isolated false \
+            --skip-feature-deployment false \
+            --plusbeta false \
+            --package-manager npm \
+            --skip-cache \
+            --skip-install
+
+      - name: Install project dependencies
+        working-directory: spfx
+        run: npm ci || npm install
+
+      - name: Overlay web part files from repo (no rsync)
+        run: |
+          mkdir -p spfx/src/webparts/currentUserLink
+          cp -R CurrentUserLink-SPFx-sample/src/webparts/currentUserLink/* spfx/src/webparts/currentUserLink/
+
+      - name: Build (Heft)
+        working-directory: spfx
+        run: npx heft build --production
+
+      - name: Package solution (.sppkg)
+        working-directory: spfx
+        run: npx gulp package-solution --ship
+
+      - name: Upload .sppkg artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sppkg
+          path: spfx/sharepoint/solution/*.sppkg
